@@ -4,15 +4,14 @@ GENERATOR DATA DUMMY UNTUK EXPERIMENT DATABASE 1NF VS 3NF
 ===================================================================================
 Deskripsi:
     Script ini menghasilkan data dummy untuk sistem akademik (KRS) dengan
-    konsistensi data yang dijaga. Output berupa:
+    konsistensi data yang dijaga. 
+    
+    UPDATE LOG:
+    - Menambahkan logika gelar akademik (Depan & Belakang) untuk Dosen.
+    
+Output:
     1. data_1nf.csv: File CSV flat (denormalized)
     2. data_3nf.sql: SQL dump untuk tabel ternormalisasi
-    
-Spesifikasi Data:
-    - 1.000 Mahasiswa unik
-    - 50 Dosen unik
-    - 100 Mata Kuliah unik (tiap MK diampu 1 dosen)
-    - 10.000+ Transaksi KRS (mahasiswa mengambil mata kuliah)
     
 Author: Database Engineering Experiment
 Date: December 2025
@@ -22,396 +21,261 @@ Date: December 2025
 import csv
 import random
 from faker import Faker
-from datetime import datetime
 
 # Inisialisasi Faker dengan locale Indonesia
 fake = Faker('id_ID')
-Faker.seed(12345)  # Untuk reproducibility
-random.seed(12345)
+Faker.seed(42)  # Untuk hasil yang reproducible
+random.seed(42)
 
+# ========== KONFIGURASI ==========
+JUMLAH_MAHASISWA = 1000
+JUMLAH_DOSEN = 50
+JUMLAH_MATA_KULIAH = 100
+JUMLAH_TRANSAKSI_KRS = 10000
 
-class MahasiswaGenerator:
+# ========== MASTER DATA CONTAINERS ==========
+data_mahasiswa = []
+data_dosen = []
+data_mata_kuliah = []
+data_krs = []
+
+# ========== FUNGSI HELPER ==========
+
+def generate_nim(index):
+    """Generate NIM dengan format: 2020XXXXX (5 digit unik)"""
+    return f"2020{str(index).zfill(5)}"
+
+def generate_nidn(index):
+    """Generate NIDN dengan format: 01XXXXXXXX (8 digit unik)"""
+    return f"01{str(index).zfill(8)}"
+
+def generate_kode_mk(index):
+    """Generate Kode MK dengan format: SI001, SI002, dst"""
+    return f"SI{str(index).zfill(3)}"
+
+def generate_no_hp_indonesia():
+    """Generate nomor HP Indonesia dengan format 08xx-xxxx-xxxx"""
+    prefixes = ['0811', '0812', '0813', '0821', '0822', '0823', '0851', '0852', '0853', '0856', '0857', '0858']
+    prefix = random.choice(prefixes)
+    suffix = ''.join([str(random.randint(0, 9)) for _ in range(8)])
+    return f"{prefix}-{suffix[:4]}-{suffix[4:]}"
+
+def generate_nama_mahasiswa():
+    """Generate nama mahasiswa (Tanpa Gelar)"""
+    return f"{fake.first_name()} {fake.last_name()}"
+
+def generate_nama_dosen_bergelar():
     """
-    Generator untuk membuat data dummy mahasiswa.
-    Menghasilkan NIM unik dan nama lengkap yang realistis.
+    Generate nama dosen lengkap dengan gelar depan dan belakang
+    secara random namun logis.
     """
+    nama_dasar = f"{fake.first_name()} {fake.last_name()}"
     
-    def __init__(self, jumlah=1000):
-        """
-        Args:
-            jumlah (int): Jumlah mahasiswa yang akan digenerate
-        """
-        self.jumlah = jumlah
-        self.data_mahasiswa = []
+    # Opsi Gelar Depan
+    # Bobot: Kosong (40%), Ir. (10%), Dr. (30%), Prof. Dr. (20%)
+    list_gelar_depan = ['', '', '', '', 'Ir.', 'Dr.', 'Dr.', 'Dr.', 'Prof. Dr.', 'Prof. Dr.']
+    gelar_depan = random.choice(list_gelar_depan)
     
-    def generate(self):
-        """
-        Generate data mahasiswa dengan NIM format: YYYYNNNNN
-        YYYY = Tahun masuk (2020-2024)
-        NNNNN = Nomor urut 5 digit
-        
-        Returns:
-            list: List of dict berisi nim dan nama_lengkap
-        """
-        print(f"[INFO] Generating {self.jumlah} data mahasiswa...")
-        
-        for i in range(self.jumlah):
-            tahun_masuk = random.choice([2020, 2021, 2022, 2023, 2024])
-            nomor_urut = str(i + 1).zfill(5)
-            nim = f"{tahun_masuk}{nomor_urut}"
-            nama_lengkap = fake.name()
-            
-            self.data_mahasiswa.append({
-                'nim': nim,
-                'nama_lengkap': nama_lengkap
-            })
-        
-        print(f"[SUCCESS] {len(self.data_mahasiswa)} mahasiswa berhasil digenerate")
-        return self.data_mahasiswa
+    # Opsi Gelar Belakang (Komputer & Teknik)
+    list_gelar_belakang = [
+        'S.Kom., M.Kom.', 
+        'S.T., M.T.', 
+        'S.Si., M.Cs.', 
+        'M.Kom., Ph.D.', 
+        'S.Kom., M.T.',
+        'S.Kom., M.MSI',
+        'S.T., M.Eng.',
+        'Ph.D.'
+    ]
+    gelar_belakang = random.choice(list_gelar_belakang)
+    
+    # Merakit Nama
+    if gelar_depan:
+        return f"{gelar_depan} {nama_dasar}, {gelar_belakang}"
+    else:
+        return f"{nama_dasar}, {gelar_belakang}"
 
+def generate_nama_mk():
+    """Generate nama mata kuliah IT yang realistis"""
+    mata_kuliah_list = [
+        "Algoritma dan Pemrograman", "Basis Data", "Struktur Data",
+        "Sistem Operasi", "Jaringan Komputer", "Pemrograman Web",
+        "Kecerdasan Buatan", "Machine Learning", "Data Mining",
+        "Keamanan Informasi", "Mobile Programming", "Cloud Computing",
+        "PBO Lanjut", "Matematika Diskrit", "Statistika Probabilitas",
+        "Aljabar Linear", "Kalkulus I", "Kalkulus II",
+        "Rekayasa Perangkat Lunak", "Interaksi Manusia dan Komputer",
+        "Grafika Komputer", "Pengolahan Citra Digital", "Sistem Informasi Manajemen",
+        "ERP Systems", "Business Intelligence", "Internet of Things (IoT)", 
+        "Blockchain Technology", "DevOps Engineering", "Software Testing", 
+        "Metodologi Agile", "Analisis Desain Sistem", "Cyber Security", 
+        "Network Security", "Ethical Hacking", "Digital Forensics", 
+        "Audit Sistem Informasi", "Big Data Analytics", "Visualisasi Data", 
+        "Natural Language Processing", "Computer Vision", "Deep Learning", 
+        "Reinforcement Learning", "Web Development Lanjut", "Game Development", 
+        "Augmented Reality", "Virtual Reality", "Robotika Dasar", 
+        "Sistem Tertanam", "Pemrograman Mikrokontroler", "Sinyal Digital", 
+        "Arsitektur Komputer", "Teknik Kompilasi", "Sistem Terdistribusi", 
+        "Komputasi Paralel", "Quantum Computing Intro", "Bioinformatika", 
+        "E-Commerce Strategy", "Digital Marketing", "Manajemen Proyek TI", 
+        "Penjaminan Mutu Software", "User Experience (UX) Design",
+        "Information Retrieval", "Semantic Web", "Manajemen Pengetahuan", 
+        "Sistem Pendukung Keputusan", "Sistem Pakar", "Logika Fuzzy", 
+        "Jaringan Syaraf Tiruan", "Algoritma Genetika", "Smart City", 
+        "Pengembangan Aplikasi Mobile", "Pemrograman Lintas Platform", 
+        "Desain API", "Arsitektur Microservices", "Komputasi Serverless", 
+        "Manajemen Basis Data Lanjut", "Data Warehouse"
+    ]
+    return random.choice(mata_kuliah_list)
 
-class DosenGenerator:
-    """
-    Generator untuk membuat data dummy dosen.
-    Menghasilkan NIDN unik, nama, dan nomor HP.
-    """
-    
-    def __init__(self, jumlah=50):
-        """
-        Args:
-            jumlah (int): Jumlah dosen yang akan digenerate
-        """
-        self.jumlah = jumlah
-        self.data_dosen = []
-    
-    def generate(self):
-        """
-        Generate data dosen dengan NIDN format: 10 digit angka
-        
-        Returns:
-            list: List of dict berisi nidn, nama_lengkap, no_hp
-        """
-        print(f"[INFO] Generating {self.jumlah} data dosen...")
-        
-        for i in range(self.jumlah):
-            nidn = f"0{str(random.randint(100000000, 999999999))}"
-            nama_lengkap = fake.name()
-            no_hp = fake.phone_number()
-            
-            self.data_dosen.append({
-                'nidn': nidn,
-                'nama_lengkap': nama_lengkap,
-                'no_hp': no_hp
-            })
-        
-        print(f"[SUCCESS] {len(self.data_dosen)} dosen berhasil digenerate")
-        return self.data_dosen
+# ========== STEP 1: GENERATE MAHASISWA ==========
+print("🔄 Generating Mahasiswa...")
+for i in range(1, JUMLAH_MAHASISWA + 1):
+    data_mahasiswa.append({
+        'nim': generate_nim(i),
+        'nama_lengkap': generate_nama_mahasiswa(), # Mahasiswa nama biasa
+        'nohp_mhs': generate_no_hp_indonesia()
+    })
+print(f"✅ {JUMLAH_MAHASISWA} Mahasiswa berhasil digenerate")
 
+# ========== STEP 2: GENERATE DOSEN (DENGAN GELAR) ==========
+print("🔄 Generating Dosen (dengan gelar akademik)...")
+for i in range(1, JUMLAH_DOSEN + 1):
+    data_dosen.append({
+        'nidn': generate_nidn(i),
+        'nama_lengkap': generate_nama_dosen_bergelar() # Dosen pakai gelar
+    })
+print(f"✅ {JUMLAH_DOSEN} Dosen berhasil digenerate")
 
-class MataKuliahGenerator:
-    """
-    Generator untuk membuat data dummy mata kuliah.
-    Setiap MK akan diassign ke satu dosen pengampu.
-    """
-    
-    def __init__(self, jumlah=100, data_dosen=None):
-        """
-        Args:
-            jumlah (int): Jumlah mata kuliah yang akan digenerate
-            data_dosen (list): List data dosen untuk assignment
-        """
-        self.jumlah = jumlah
-        self.data_dosen = data_dosen or []
-        self.data_mata_kuliah = []
-        
-        # Daftar nama mata kuliah yang umum
-        self.nama_mk_pool = [
-            "Basis Data", "Algoritma", "Struktur Data", "Pemrograman Web",
-            "Sistem Operasi", "Jaringan Komputer", "Kecerdasan Buatan",
-            "Machine Learning", "Data Mining", "Sistem Informasi",
-            "Rekayasa Perangkat Lunak", "Grafika Komputer", "Komputer Vision",
-            "Keamanan Siber", "Cloud Computing", "Mobile Programming",
-            "Internet of Things", "Blockchain", "DevOps", "UI/UX Design",
-            "Matematika Diskrit", "Statistika", "Kalkulus", "Aljabar Linear",
-            "Fisika Dasar", "Bahasa Inggris", "Pancasila", "Kewarganegaraan",
-            "Etika Profesi", "Kewirausahaan", "Manajemen Proyek",
-            "Analisis dan Perancangan Sistem", "Pemrograman Berorientasi Objek",
-            "Pemrograman Fungsional", "Teori Komputasi", "Automata"
-        ]
-    
-    def generate(self):
-        """
-        Generate data mata kuliah dengan kode MK format: XXnnn
-        XX = Prefix (IF, SI, TI, dll)
-        nnn = Nomor urut 3 digit
-        
-        Returns:
-            list: List of dict berisi kode_mk, nama_mk, sks, nidn_dosen
-        """
-        print(f"[INFO] Generating {self.jumlah} data mata kuliah...")
-        
-        prefix_pool = ['IF', 'SI', 'TI', 'MI', 'KI']
-        
-        for i in range(self.jumlah):
-            prefix = random.choice(prefix_pool)
-            nomor_urut = str(i + 1).zfill(3)
-            kode_mk = f"{prefix}{nomor_urut}"
-            
-            # Pilih nama mata kuliah dan tambahkan level
-            nama_base = random.choice(self.nama_mk_pool)
-            level = random.choice(['', ' I', ' II', ' III', ' Lanjut', ' Dasar'])
-            nama_mk = f"{nama_base}{level}"
-            
-            sks = random.choice([2, 3, 4])
-            
-            # Assign dosen pengampu secara random
-            dosen_pengampu = random.choice(self.data_dosen)
-            nidn_dosen = dosen_pengampu['nidn']
-            
-            self.data_mata_kuliah.append({
-                'kode_mk': kode_mk,
-                'nama_mk': nama_mk,
-                'sks': sks,
-                'nidn_dosen': nidn_dosen
-            })
-        
-        print(f"[SUCCESS] {len(self.data_mata_kuliah)} mata kuliah berhasil digenerate")
-        return self.data_mata_kuliah
+# ========== STEP 3: GENERATE MATA KULIAH ==========
+print("🔄 Generating Mata Kuliah...")
+sks_options = [2, 3, 4]
+nama_mk_used = set()
 
+for i in range(1, JUMLAH_MATA_KULIAH + 1):
+    # Generate nama MK unik
+    nama_mk = generate_nama_mk()
+    attempt = 0
+    while nama_mk in nama_mk_used and attempt < 100:
+        nama_mk = generate_nama_mk()
+        attempt += 1
+    nama_mk_used.add(nama_mk)
+    
+    data_mata_kuliah.append({
+        'kode_mk': generate_kode_mk(i),
+        'nama_mk': nama_mk,
+        'sks': random.choice(sks_options),
+        'nidn_dosen': random.choice(data_dosen)['nidn']
+    })
+print(f"✅ {JUMLAH_MATA_KULIAH} Mata Kuliah berhasil digenerate")
 
-class KRSGenerator:
-    """
-    Generator untuk membuat data transaksi KRS (Kartu Rencana Studi).
-    Menghubungkan mahasiswa dengan mata kuliah yang diambil.
-    """
-    
-    def __init__(self, jumlah=10000, data_mahasiswa=None, data_mata_kuliah=None):
-        """
-        Args:
-            jumlah (int): Jumlah transaksi KRS yang akan digenerate
-            data_mahasiswa (list): List data mahasiswa
-            data_mata_kuliah (list): List data mata kuliah
-        """
-        self.jumlah = jumlah
-        self.data_mahasiswa = data_mahasiswa or []
-        self.data_mata_kuliah = data_mata_kuliah or []
-        self.data_krs = []
-    
-    def generate(self):
-        """
-        Generate data KRS dengan random assignment mahasiswa ke mata kuliah.
-        Setiap mahasiswa bisa mengambil 3-8 mata kuliah per semester.
-        
-        Returns:
-            list: List of dict berisi nim, kode_mk
-        """
-        print(f"[INFO] Generating {self.jumlah} data transaksi KRS...")
-        
-        transaksi_count = 0
-        
-        while transaksi_count < self.jumlah:
-            # Pilih mahasiswa random
-            mahasiswa = random.choice(self.data_mahasiswa)
-            nim = mahasiswa['nim']
-            
-            # Setiap mahasiswa mengambil 3-8 MK (realistis per semester)
-            jumlah_mk = random.randint(3, 8)
-            mata_kuliah_dipilih = random.sample(self.data_mata_kuliah, 
-                                                min(jumlah_mk, len(self.data_mata_kuliah)))
-            
-            for mk in mata_kuliah_dipilih:
-                self.data_krs.append({
-                    'nim': nim,
-                    'kode_mk': mk['kode_mk']
-                })
-                transaksi_count += 1
-                
-                if transaksi_count >= self.jumlah:
-                    break
-        
-        print(f"[SUCCESS] {len(self.data_krs)} transaksi KRS berhasil digenerate")
-        return self.data_krs
+# ========== STEP 4: GENERATE KRS (TRANSAKSI) ==========
+print("🔄 Generating Transaksi KRS...")
 
+kombinasi_unik = set()
+attempt_count = 0
+max_attempts = JUMLAH_TRANSAKSI_KRS * 5
 
-class DataExporter:
-    """
-    Class untuk export data ke format CSV (1NF) dan SQL Dump (3NF).
-    """
+while len(data_krs) < JUMLAH_TRANSAKSI_KRS and attempt_count < max_attempts:
+    mhs = random.choice(data_mahasiswa)
+    mk = random.choice(data_mata_kuliah)
     
-    def __init__(self, data_mahasiswa, data_dosen, data_mata_kuliah, data_krs):
-        """
-        Args:
-            data_mahasiswa (list): Data mahasiswa
-            data_dosen (list): Data dosen
-            data_mata_kuliah (list): Data mata kuliah
-            data_krs (list): Data transaksi KRS
-        """
-        self.data_mahasiswa = {m['nim']: m for m in data_mahasiswa}
-        self.data_dosen = {d['nidn']: d for d in data_dosen}
-        self.data_mata_kuliah = {mk['kode_mk']: mk for mk in data_mata_kuliah}
-        self.data_krs = data_krs
+    kombinasi = (mhs['nim'], mk['kode_mk'])
     
-    def export_to_1nf_csv(self, filename='data_1nf.csv'):
-        """
-        Export data ke format CSV (Flat Table - Denormalized).
-        Semua informasi digabung dalam satu baris (banyak duplikasi).
+    if kombinasi not in kombinasi_unik:
+        kombinasi_unik.add(kombinasi)
         
-        Args:
-            filename (str): Nama file output CSV
-        """
-        print(f"\n[INFO] Exporting data ke {filename} (Format 1NF - Denormalized)...")
+        # Ambil data dosen (yang sudah ada gelarnya)
+        dosen = next(d for d in data_dosen if d['nidn'] == mk['nidn_dosen'])
         
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-            fieldnames = [
-                'nim', 'nama_mhs', 'kode_mk', 'nama_mk', 'sks', 
-                'nidn_dosen', 'nama_dosen', 'nohp_dosen'
-            ]
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            for krs in self.data_krs:
-                nim = krs['nim']
-                kode_mk = krs['kode_mk']
-                
-                # Lookup data dari master
-                mahasiswa = self.data_mahasiswa[nim]
-                mata_kuliah = self.data_mata_kuliah[kode_mk]
-                dosen = self.data_dosen[mata_kuliah['nidn_dosen']]
-                
-                # Write row dengan semua kolom (DUPLIKASI TINGGI!)
-                writer.writerow({
-                    'nim': nim,
-                    'nama_mhs': mahasiswa['nama_lengkap'],
-                    'kode_mk': kode_mk,
-                    'nama_mk': mata_kuliah['nama_mk'],
-                    'sks': mata_kuliah['sks'],
-                    'nidn_dosen': dosen['nidn'],
-                    'nama_dosen': dosen['nama_lengkap'],
-                    'nohp_dosen': dosen['no_hp']
-                })
-        
-        print(f"[SUCCESS] File {filename} berhasil dibuat!")
+        data_krs.append({
+            'nim': mhs['nim'],
+            'nama_mhs': mhs['nama_lengkap'],
+            'kode_mk': mk['kode_mk'],
+            'nama_mk': mk['nama_mk'],
+            'sks': mk['sks'],
+            'nidn_dosen': dosen['nidn'],
+            'nama_dosen': dosen['nama_lengkap'], # Ini akan berisi nama bergelar
+            'nohp_mhs': mhs['nohp_mhs']
+        })
     
-    def export_to_3nf_sql(self, filename='data_3nf.sql'):
-        """
-        Export data ke format SQL Dump (Normalized - 3NF).
-        Data dipecah ke tabel: mahasiswa, dosen, mata_kuliah, krs.
-        
-        Args:
-            filename (str): Nama file output SQL
-        """
-        print(f"\n[INFO] Exporting data ke {filename} (Format 3NF - Normalized)...")
-        
-        with open(filename, 'w', encoding='utf-8') as sqlfile:
-            # Header SQL
-            sqlfile.write("-- ============================================\n")
-            sqlfile.write("-- SQL DUMP: DATABASE 3NF (NORMALIZED)\n")
-            sqlfile.write("-- Generated: " + datetime.now().strftime("%Y-%m-%d %H:%M:%S") + "\n")
-            sqlfile.write("-- ============================================\n\n")
-            
-            # SECTION 1: INSERT DATA MAHASISWA
-            sqlfile.write("-- ============================================\n")
-            sqlfile.write("-- TABLE: mahasiswa\n")
-            sqlfile.write("-- ============================================\n")
-            
-            for nim, mahasiswa in self.data_mahasiswa.items():
-                nama_escaped = mahasiswa['nama_lengkap'].replace("'", "''")
-                sql = f"INSERT INTO mahasiswa (nim, nama_lengkap) VALUES ('{nim}', '{nama_escaped}');\n"
-                sqlfile.write(sql)
-            
-            sqlfile.write("\n")
-            
-            # SECTION 2: INSERT DATA DOSEN
-            sqlfile.write("-- ============================================\n")
-            sqlfile.write("-- TABLE: dosen\n")
-            sqlfile.write("-- ============================================\n")
-            
-            for nidn, dosen in self.data_dosen.items():
-                nama_escaped = dosen['nama_lengkap'].replace("'", "''")
-                nohp_escaped = dosen['no_hp'].replace("'", "''")
-                sql = f"INSERT INTO dosen (nidn, nama_lengkap, no_hp) VALUES ('{nidn}', '{nama_escaped}', '{nohp_escaped}');\n"
-                sqlfile.write(sql)
-            
-            sqlfile.write("\n")
-            
-            # SECTION 3: INSERT DATA MATA KULIAH
-            sqlfile.write("-- ============================================\n")
-            sqlfile.write("-- TABLE: mata_kuliah\n")
-            sqlfile.write("-- ============================================\n")
-            
-            for kode_mk, mk in self.data_mata_kuliah.items():
-                nama_escaped = mk['nama_mk'].replace("'", "''")
-                sql = f"INSERT INTO mata_kuliah (kode_mk, nama_mk, sks, nidn_dosen) VALUES ('{kode_mk}', '{nama_escaped}', {mk['sks']}, '{mk['nidn_dosen']}');\n"
-                sqlfile.write(sql)
-            
-            sqlfile.write("\n")
-            
-            # SECTION 4: INSERT DATA KRS
-            sqlfile.write("-- ============================================\n")
-            sqlfile.write("-- TABLE: krs (Transaksi)\n")
-            sqlfile.write("-- ============================================\n")
-            
-            for krs in self.data_krs:
-                sql = f"INSERT INTO krs (nim, kode_mk) VALUES ('{krs['nim']}', '{krs['kode_mk']}');\n"
-                sqlfile.write(sql)
-            
-            sqlfile.write("\n-- ============================================\n")
-            sqlfile.write("-- END OF SQL DUMP\n")
-            sqlfile.write("-- ============================================\n")
-        
-        print(f"[SUCCESS] File {filename} berhasil dibuat!")
+    attempt_count += 1
 
+print(f"✅ {len(data_krs)} Transaksi KRS berhasil digenerate")
 
-def main():
-    """
-    Fungsi utama untuk orchestrate seluruh proses generate data.
-    """
-    print("="*80)
-    print("DATA GENERATOR: EXPERIMENT 1NF VS 3NF DATABASE")
-    print("="*80)
-    print()
-    
-    # STEP 1: Generate Master Data Mahasiswa
-    mahasiswa_gen = MahasiswaGenerator(jumlah=1000)
-    data_mahasiswa = mahasiswa_gen.generate()
-    print()
-    
-    # STEP 2: Generate Master Data Dosen
-    dosen_gen = DosenGenerator(jumlah=50)
-    data_dosen = dosen_gen.generate()
-    print()
-    
-    # STEP 3: Generate Master Data Mata Kuliah (dengan assignment dosen)
-    mk_gen = MataKuliahGenerator(jumlah=100, data_dosen=data_dosen)
-    data_mata_kuliah = mk_gen.generate()
-    print()
-    
-    # STEP 4: Generate Transaksi KRS (10.000+ records)
-    krs_gen = KRSGenerator(jumlah=10000, 
-                          data_mahasiswa=data_mahasiswa, 
-                          data_mata_kuliah=data_mata_kuliah)
-    data_krs = krs_gen.generate()
-    print()
-    
-    # STEP 5: Export Data
-    exporter = DataExporter(data_mahasiswa, data_dosen, data_mata_kuliah, data_krs)
-    exporter.export_to_1nf_csv('data_1nf.csv')
-    exporter.export_to_3nf_sql('data_3nf.sql')
-    
-    print("\n" + "="*80)
-    print("DATA GENERATION COMPLETED SUCCESSFULLY!")
-    print("="*80)
-    print(f"Total Mahasiswa   : {len(data_mahasiswa):,}")
-    print(f"Total Dosen       : {len(data_dosen):,}")
-    print(f"Total Mata Kuliah : {len(data_mata_kuliah):,}")
-    print(f"Total Transaksi   : {len(data_krs):,}")
-    print("="*80)
-    print("\nOutput Files:")
-    print("  1. data_1nf.csv  -> Untuk tabel FLAT (Denormalized)")
-    print("  2. data_3nf.sql  -> Untuk tabel NORMALIZED (3NF)")
-    print("\nSilakan import file-file tersebut ke MySQL untuk testing!")
-    print("="*80)
+# ========== STEP 5: EXPORT KE CSV (1NF) ==========
+print("🔄 Exporting ke CSV (1NF)...")
 
+with open('data_1nf.csv', 'w', newline='', encoding='utf-8') as csvfile:
+    fieldnames = ['nim', 'nama_mhs', 'kode_mk', 'nama_mk', 'sks', 'nidn_dosen', 'nama_dosen', 'nohp_mhs']
+    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(data_krs)
 
-if __name__ == "__main__":
-    main()
+print(f"✅ File 'data_1nf.csv' berhasil dibuat")
+
+# ========== STEP 6: EXPORT KE SQL (3NF) ==========
+print("🔄 Exporting ke SQL (3NF)...")
+
+with open('data_3nf.sql', 'w', encoding='utf-8') as sqlfile:
+    # 1. Insert Mahasiswa
+    sqlfile.write("-- ========== INSERT MAHASISWA ==========\n")
+    for mhs in data_mahasiswa:
+        nama_escaped = mhs['nama_lengkap'].replace("'", "''")
+        nohp_escaped = mhs['nohp_mhs'].replace("'", "''")
+        sqlfile.write(f"INSERT INTO mahasiswa (nim, nama_lengkap, nohp_mhs) VALUES ('{mhs['nim']}', '{nama_escaped}', '{nohp_escaped}');\n")
+    
+    sqlfile.write("\n")
+    
+    # 2. Insert Dosen (Sekarang dengan Gelar)
+    sqlfile.write("-- ========== INSERT DOSEN ==========\n")
+    for dsn in data_dosen:
+        # Replace single quote untuk safety SQL (misal O'Neil), meski jarang di nama Indo
+        nama_escaped = dsn['nama_lengkap'].replace("'", "''")
+        sqlfile.write(f"INSERT INTO dosen (nidn, nama_lengkap) VALUES ('{dsn['nidn']}', '{nama_escaped}');\n")
+    
+    sqlfile.write("\n")
+    
+    # 3. Insert Mata Kuliah
+    sqlfile.write("-- ========== INSERT MATA KULIAH ==========\n")
+    for mk in data_mata_kuliah:
+        nama_mk_escaped = mk['nama_mk'].replace("'", "''")
+        sqlfile.write(f"INSERT INTO mata_kuliah (kode_mk, nama_mk, sks, nidn_dosen) VALUES ('{mk['kode_mk']}', '{nama_mk_escaped}', {mk['sks']}, '{mk['nidn_dosen']}');\n")
+    
+    sqlfile.write("\n")
+    
+    # 4. Insert KRS
+    sqlfile.write("-- ========== INSERT KRS ==========\n")
+    
+    # Kita bagi INSERT KRS menjadi batch/chunks agar file SQL lebih mudah di-handle editor text
+    # (Opsional: tapi bagus untuk performance import)
+    sqlfile.write("INSERT INTO krs (nim, kode_mk) VALUES \n")
+    
+    values_list = []
+    for i, krs in enumerate(data_krs):
+        values_list.append(f"('{krs['nim']}', '{krs['kode_mk']}')")
+        
+        # Setiap 1000 row, kita tutup statement dan buat INSERT baru (agar buffer tidak overload)
+        if (i + 1) % 1000 == 0 and (i + 1) < len(data_krs):
+            sqlfile.write(",\n".join(values_list) + ";\n")
+            sqlfile.write("INSERT INTO krs (nim, kode_mk) VALUES \n")
+            values_list = []
+            
+    # Tulis sisa data
+    if values_list:
+        sqlfile.write(",\n".join(values_list) + ";\n")
+
+print(f"✅ File 'data_3nf.sql' berhasil dibuat")
+
+# ========== SUMMARY ==========
+print("\n" + "="*60)
+print("📊 SUMMARY GENERATION (UPDATED WITH TITLES)")
+print("="*60)
+print(f"✅ Total Mahasiswa      : {len(data_mahasiswa):,}")
+print(f"✅ Total Dosen          : {len(data_dosen):,}")
+print(f"✅ Total Mata Kuliah    : {len(data_mata_kuliah):,}")
+print(f"✅ Total Transaksi KRS  : {len(data_krs):,}")
+print(f"\n📁 File Output Siap:")
+print(f"   - data_1nf.csv (Cek kolom nama_dosen, sudah ada gelar)")
+print(f"   - data_3nf.sql (Siap import ke Database)")
+print("="*60)
