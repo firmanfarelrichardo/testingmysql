@@ -13,8 +13,8 @@
 --   - Ideal untuk sistem transaksional (OLTP)
 --
 -- Tabel:
---   1. mahasiswa      -> Master data mahasiswa
---   2. dosen          -> Master data dosen
+--   1. mahasiswa      -> Master data mahasiswa (DENGAN nohp_mhs)
+--   2. dosen          -> Master data dosen (TANPA no_hp)
 --   3. mata_kuliah    -> Master data mata kuliah (dengan relasi ke dosen)
 --   4. krs            -> Tabel transaksi (relasi mahasiswa <-> mata kuliah)
 -- ============================================
@@ -32,24 +32,24 @@ DROP TABLE IF EXISTS mahasiswa;
 CREATE TABLE mahasiswa (
     nim VARCHAR(20) PRIMARY KEY,
     nama_lengkap VARCHAR(100) NOT NULL,
+    nohp_mhs VARCHAR(20) NOT NULL COMMENT 'Nomor HP mahasiswa format Indonesia (08xx-xxxx-xxxx)',
     
     -- Index untuk mempercepat pencarian berdasarkan nama
     INDEX idx_nama (nama_lengkap)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Master data mahasiswa (1000 records)';
+COMMENT='Master data mahasiswa dengan nomor HP (1000 records)';
 
 -- ============================================
 -- TABEL 2: DOSEN
 -- ============================================
 CREATE TABLE dosen (
     nidn VARCHAR(20) PRIMARY KEY,
-    nama_lengkap VARCHAR(100) NOT NULL,
-    no_hp VARCHAR(20),
+    nama_lengkap VARCHAR(200) NOT NULL COMMENT 'Nama dosen dengan gelar akademik',
     
     -- Index untuk mempercepat pencarian berdasarkan nama
     INDEX idx_nama (nama_lengkap)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Master data dosen pengajar (50 records)';
+COMMENT='Master data dosen pengajar dengan gelar akademik (50 records)';
 
 -- ============================================
 -- TABEL 3: MATA_KULIAH
@@ -103,16 +103,18 @@ COMMENT='Tabel transaksi KRS (10,000+ records)';
 -- ============================================
 -- CARA IMPORT DATA SQL DUMP KE DATABASE INI:
 -- ============================================
--- Method 1: Menggunakan MySQL Command Line
--- mysql -u root -p nama_database < data_3nf.sql
+-- Method 1: Menggunakan MySQL Command Line (Windows CMD/PowerShell)
+-- mysql -u root -p experiment_db < data_3nf.sql
 
 -- Method 2: Menggunakan MySQL Workbench
 -- 1. File -> Run SQL Script
 -- 2. Pilih file data_3nf.sql
 -- 3. Execute
 
--- Method 3: Menggunakan SOURCE command di MySQL CLI
--- SOURCE C:/path/to/data_3nf.sql;
+-- Method 3: Menggunakan SOURCE command di MySQL CLI (RECOMMENDED)
+-- mysql -u root -p
+-- USE experiment_db;
+-- SOURCE C:/Users/ASUS/Documents/SEMESTER 5/Basis Data Lanjut/TestingKRS/data_3nf.sql;
 
 -- ============================================
 -- CONTOH QUERY UNTUK CEK DATA & RELASI
@@ -128,10 +130,10 @@ COMMENT='Tabel transaksi KRS (10,000+ records)';
 -- SELECT 'KRS', COUNT(*) FROM krs;
 
 -- Cek relasi: Mahasiswa dengan KRS-nya
--- SELECT m.nim, m.nama_lengkap, COUNT(k.kode_mk) AS jumlah_mk
+-- SELECT m.nim, m.nama_lengkap, m.nohp_mhs, COUNT(k.kode_mk) AS jumlah_mk
 -- FROM mahasiswa m
 -- LEFT JOIN krs k ON m.nim = k.nim
--- GROUP BY m.nim, m.nama_lengkap
+-- GROUP BY m.nim, m.nama_lengkap, m.nohp_mhs
 -- LIMIT 10;
 
 -- Cek relasi: Dosen dengan Mata Kuliah yang diampu
@@ -145,14 +147,18 @@ COMMENT='Tabel transaksi KRS (10,000+ records)';
 -- VISUALISASI RELASI (ERD)
 -- ============================================
 -- mahasiswa (1) ----< krs >---- (1) mata_kuliah
---                                        |
+--   |nohp_mhs|                          |
 --                                        | (N:1)
 --                                        |
 --                                    dosen (1)
+--                                   |nama_lengkap|
+--                                   (dengan gelar)
 --
 -- Keterangan:
 -- - Satu mahasiswa bisa mengambil banyak mata kuliah (1:N via KRS)
 -- - Satu mata kuliah bisa diambil banyak mahasiswa (N:M via KRS)
 -- - Satu mata kuliah diampu oleh satu dosen (N:1)
 -- - Satu dosen bisa mengampu banyak mata kuliah (1:N)
+-- - Mahasiswa memiliki nomor HP (nohp_mhs)
+-- - Dosen memiliki nama lengkap dengan gelar akademik
 -- ============================================

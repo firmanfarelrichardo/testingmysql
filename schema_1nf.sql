@@ -24,7 +24,7 @@ CREATE TABLE tabel_krs_1nf (
     -- Data Mahasiswa (akan duplikat untuk setiap mata kuliah yang diambil)
     nim VARCHAR(20) NOT NULL,
     nama_mhs VARCHAR(100) NOT NULL,
-    
+    nohp_mhs VARCHAR(20) NOT NULL,
     -- Data Mata Kuliah
     kode_mk VARCHAR(10) NOT NULL,
     nama_mk VARCHAR(100) NOT NULL,
@@ -33,7 +33,7 @@ CREATE TABLE tabel_krs_1nf (
     -- Data Dosen (akan duplikat untuk setiap mahasiswa yang mengambil MK ini)
     nidn_dosen VARCHAR(20) NOT NULL,
     nama_dosen VARCHAR(100) NOT NULL,
-    nohp_dosen VARCHAR(20) NOT NULL,
+    
     
     -- Index untuk mempercepat query
     INDEX idx_nim (nim),
