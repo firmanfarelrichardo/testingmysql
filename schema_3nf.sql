@@ -1,100 +1,50 @@
--- ============================================
--- DATABASE SCHEMA: 3NF (NORMALIZED)
--- ============================================
--- Deskripsi:
---   Database ini mengikuti prinsip normalisasi Third Normal Form (3NF).
---   Data dipecah menjadi 4 tabel dengan relasi yang jelas.
---   
--- Karakteristik:
---   - Minimal duplikasi data (efisien storage)
---   - Integritas data terjaga dengan Foreign Key
---   - Update data lebih aman (tidak ada anomali)
---   - Query kompleks membutuhkan JOIN (bisa lebih lambat)
---   - Ideal untuk sistem transaksional (OLTP)
---
--- Tabel:
---   1. mahasiswa      -> Master data mahasiswa (DENGAN nohp_mhs)
---   2. dosen          -> Master data dosen (TANPA no_hp)
---   3. mata_kuliah    -> Master data mata kuliah (dengan relasi ke dosen)
---   4. krs            -> Tabel transaksi (relasi mahasiswa <-> mata kuliah)
--- ============================================
+-- Schema 3NF (Normalized)
+-- Minimal duplikasi, integritas terjaga, UPDATE aman
 
--- Drop tables jika sudah ada (untuk re-run script)
--- Urutan drop: child dulu, parent terakhir (karena FK constraint)
 DROP TABLE IF EXISTS krs;
 DROP TABLE IF EXISTS mata_kuliah;
 DROP TABLE IF EXISTS dosen;
 DROP TABLE IF EXISTS mahasiswa;
 
--- ============================================
--- TABEL 1: MAHASISWA
--- ============================================
 CREATE TABLE mahasiswa (
     nim VARCHAR(20) PRIMARY KEY,
     nama_lengkap VARCHAR(100) NOT NULL,
-    nohp_mhs VARCHAR(20) NOT NULL COMMENT 'Nomor HP mahasiswa format Indonesia (08xx-xxxx-xxxx)',
-    
-    -- Index untuk mempercepat pencarian berdasarkan nama
+    nohp_mhs VARCHAR(20) NOT NULL,
     INDEX idx_nama (nama_lengkap)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Master data mahasiswa dengan nomor HP (1000 records)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- TABEL 2: DOSEN
--- ============================================
 CREATE TABLE dosen (
     nidn VARCHAR(20) PRIMARY KEY,
-    nama_lengkap VARCHAR(200) NOT NULL COMMENT 'Nama dosen dengan gelar akademik',
-    
-    -- Index untuk mempercepat pencarian berdasarkan nama
+    nama_lengkap VARCHAR(200) NOT NULL,
     INDEX idx_nama (nama_lengkap)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Master data dosen pengajar dengan gelar akademik (50 records)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- TABEL 3: MATA_KULIAH
--- ============================================
 CREATE TABLE mata_kuliah (
     kode_mk VARCHAR(10) PRIMARY KEY,
     nama_mk VARCHAR(100) NOT NULL,
     sks INT NOT NULL CHECK (sks BETWEEN 1 AND 6),
     nidn_dosen VARCHAR(20) NOT NULL,
-    
-    -- Foreign Key: Setiap mata kuliah HARUS diampu oleh satu dosen
     CONSTRAINT fk_mk_dosen FOREIGN KEY (nidn_dosen) 
         REFERENCES dosen(nidn)
-        ON DELETE RESTRICT  -- Tidak boleh hapus dosen jika masih mengajar
-        ON UPDATE CASCADE,  -- Jika NIDN dosen berubah, update otomatis
-    
-    -- Index untuk mempercepat join
+        ON DELETE RESTRICT
+        ON UPDATE CASCADE,
     INDEX idx_nama_mk (nama_mk),
     INDEX idx_nidn_dosen (nidn_dosen)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-COMMENT='Master data mata kuliah (100 records)';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- TABEL 4: KRS (Kartu Rencana Studi)
--- ============================================
 CREATE TABLE krs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nim VARCHAR(20) NOT NULL,
     kode_mk VARCHAR(10) NOT NULL,
-    
-    -- Foreign Keys: Tabel transaksi yang menghubungkan mahasiswa dengan mata kuliah
     CONSTRAINT fk_krs_mahasiswa FOREIGN KEY (nim) 
         REFERENCES mahasiswa(nim)
-        ON DELETE CASCADE   -- Jika mahasiswa dihapus, KRS-nya ikut terhapus
+        ON DELETE CASCADE
         ON UPDATE CASCADE,
-    
     CONSTRAINT fk_krs_matakuliah FOREIGN KEY (kode_mk) 
         REFERENCES mata_kuliah(kode_mk)
-        ON DELETE CASCADE   -- Jika MK dihapus, KRS-nya ikut terhapus
+        ON DELETE CASCADE
         ON UPDATE CASCADE,
-    
-    -- Constraint: Satu mahasiswa tidak boleh mengambil MK yang sama 2x
     UNIQUE KEY unique_krs (nim, kode_mk),
-    
-    -- Index untuk mempercepat query
     INDEX idx_nim (nim),
     INDEX idx_kode_mk (kode_mk)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci

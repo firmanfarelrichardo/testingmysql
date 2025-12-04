@@ -1,45 +1,11 @@
--- ============================================
--- SETUP DATABASE LENGKAP: 1NF vs 3NF Experiment
--- ============================================
--- Deskripsi:
---   File SQL LENGKAP yang berisi:
---   1. Pembuatan database experiment_db
---   2. Schema 1NF (tabel denormalized)
---   3. Schema 3NF (4 tabel normalized dengan relasi)
---   4. Data lengkap untuk 3NF (1000 mahasiswa, 50 dosen, 100 MK, 10000+ KRS)
---   5. Data lengkap untuk 1NF (10000 baris flat table)
---
--- Cara Penggunaan:
---   Method 1 (MySQL Command Line):
---     mysql -u root -p < setup_database.sql
---
---   Method 2 (MySQL Workbench):
---     1. File  Run SQL Script
---     2. Pilih file setup_database.sql
---     3. Klik Execute
---
--- Setelah menjalankan script ini:
---    Database experiment_db sudah siap
---    Semua tabel (1NF & 3NF) sudah dibuat
---    Semua data sudah ter-import
---    Siap untuk testing benchmark!
--- ============================================
+-- Setup Database Lengkap: 1NF vs 3NF
+-- Penggunaan: mysql -u root -p < setup_database.sql
 
--- Drop database jika sudah ada (untuk fresh install)
 DROP DATABASE IF EXISTS experiment_db;
-
--- Buat database baru
-CREATE DATABASE experiment_db
-CHARACTER SET utf8mb4
-COLLATE utf8mb4_unicode_ci;
-
--- Gunakan database
+CREATE DATABASE experiment_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE experiment_db;
 
--- ============================================
--- BAGIAN 1: SCHEMA 1NF (DENORMALIZED)
--- ============================================
-
+-- Schema 1NF (Denormalized)
 DROP TABLE IF EXISTS tabel_krs_1nf;
 
 CREATE TABLE tabel_krs_1nf (
@@ -58,10 +24,7 @@ CREATE TABLE tabel_krs_1nf (
     INDEX idx_nama_mhs (nama_mhs)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================
--- BAGIAN 2: SCHEMA 3NF (NORMALIZED)
--- ============================================
-
+-- Schema 3NF (Normalized)
 DROP TABLE IF EXISTS krs;
 DROP TABLE IF EXISTS mata_kuliah;
 DROP TABLE IF EXISTS dosen;
