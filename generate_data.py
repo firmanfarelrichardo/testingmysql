@@ -6,7 +6,6 @@ import csv
 import random
 from faker import Faker
 
-# Inisialisasi Faker dengan locale Indonesia
 fake = Faker('id_ID')
 Faker.seed(42)
 random.seed(42)

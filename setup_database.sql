@@ -5,9 +5,6 @@ DROP DATABASE IF EXISTS experiment_db;
 CREATE DATABASE experiment_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE experiment_db;
 
--- Schema 1NF (Denormalized)
-DROP TABLE IF EXISTS tabel_krs_1nf;
-
 CREATE TABLE tabel_krs_1nf (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nim VARCHAR(20) NOT NULL,
@@ -25,10 +22,6 @@ CREATE TABLE tabel_krs_1nf (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Schema 3NF (Normalized)
-DROP TABLE IF EXISTS krs;
-DROP TABLE IF EXISTS mata_kuliah;
-DROP TABLE IF EXISTS dosen;
-DROP TABLE IF EXISTS mahasiswa;
 
 CREATE TABLE mahasiswa (
     nim VARCHAR(20) PRIMARY KEY,
